@@ -1,9 +1,8 @@
-/* App.css */
 html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #343541; /* Dark background similar to ChatGPT */
+  background-color: #343541;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #ececf1;
 }
