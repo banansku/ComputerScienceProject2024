@@ -1,42 +1,86 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* App.css */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #343541; /* Dark background similar to ChatGPT */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #ececf1;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.App {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 90%;
+  max-width: 600px;
+  height: 80vh;
+  background-color: #444654;
+  border-radius: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.message {
+  max-width: 80%;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  line-height: 1.5;
+  word-wrap: break-word;
 }
 
-.card {
-  padding: 2em;
+.message.user {
+  align-self: flex-end;
+  background-color: #2d2d2d;
+  color: #ececf1;
 }
 
-.read-the-docs {
-  color: #888;
+.message.system {
+  align-self: flex-start;
+  background-color: #565b69;
+  color: #ececf1;
+}
+
+.input-container {
+  display: flex;
+  align-items: center;
+  background-color: #565b69;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  background-color: #3a3d4d;
+  color: #ececf1;
+  outline: none;
+}
+
+button {
+  margin-left: 10px;
+  padding: 10px 15px;
+  border: none;
+  background-color: #10a37f;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: #0e8a6c;
 }
