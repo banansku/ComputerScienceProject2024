@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import assemblyai as aai
 import openai
 import requests
@@ -8,10 +9,11 @@ import yt_dlp
 import os
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
 # Set your API keys here
-assembly_api_key = os.getenv("ASSEMBLY_API_KEY")
+aai.settings.api_key = os.getenv("ASSEMBLY_API_KEY")
 openai.api_key = os.getenv("openai.api_key")
 test_url = os.getenv("test_url")
 
@@ -36,24 +38,61 @@ def upload_video():
     for format in info["formats"][::-1]:
         if format["resolution"] == "audio only" and format["ext"] == "m4a":
             url = format["url"]
+            print(url)
             break
-    video_url = url
-        
-    return jsonify({"error": video_url}), 200
 
     if not video_url:
         return jsonify({"error": "Video URL is required"}), 400
 
-    #headers = {'authorization': ASSEMBLYAI_API_KEY}
-    #data = {'audio_url': video_url}
+    '''headers = {'authorization': ASSEMBLY_API_KEY}
+    data = {'audio_url': video_url}'''
 
-    #try:
-     #   response = requests.post('https://api.assemblyai.com/v2/transcript', json=data, headers=headers)
-      #  response_data = response.json()
-     #   transcription_id = response_data['id']
-    #    return jsonify({"transcription_id": transcription_id})
-  #  except Exception as e:
-     #   return jsonify({"error": str(e)}), 500
+    transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(url)
+    print(transcript.text)
+
+    return jsonify({"transcription": transcript.text})
+
+    '''try:
+        response = requests.post('https://api.assemblyai.com/v2/transcript', json=data, headers=headers)
+        return jsonify({"response": response})
+        response_data = response.json()
+        transcription_id = response_data['id']
+        return jsonify({"transcription_id": transcript})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500'''
+
+@socketio.on('track_transcription')
+def track_transcription(data):
+    transcription_id = data.get('transcription_id')
+    if not transcription_id:
+        emit('error', {"error": "Transcription ID is required"})
+        return
+
+    headers = {'authorization': assembly_api_key}
+    url = f'https://api.assemblyai.com/v2/transcript/{transcription_id}'
+
+    try:
+        # Poll until transcription is completed, sending progress updates
+        while True:
+            response = requests.get(url, headers=headers)
+            response_data = response.json()
+
+            status = response_data.get('status')
+            if status == 'completed':
+                transcription_text = response_data.get('text', '')
+                emit('transcription_completed', {"transcription_text": transcription_text})
+                break
+            elif status == 'failed':
+                emit('error', {"error": "Transcription failed"})
+                break
+            else:
+                # Emit the status update to the frontend
+                emit('status_update', {"status": status})
+                print(status)
+                time.sleep(2)  # Wait 2 seconds before checking again
+    except Exception as e:
+        emit('error', {"error": str(e)})
 
 # API Endpoint 2: Retrieve Transcription
 @app.route('/api/get-transcription/<transcription_id>', methods=['GET'])
