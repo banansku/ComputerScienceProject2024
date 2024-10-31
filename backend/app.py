@@ -136,6 +136,124 @@ def summarize_transcription():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+
+
+
+from pydub import AudioSegment
+# Download the audio file as before
+def download_video_as_audio(url: str, audio_format: str = 'mp3'):
+    home_directory = os.path.expanduser("~")
+    output_path = os.path.join(home_directory, '%(title)s.%(ext)s')
+    
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'extractaudio': True,
+        'audioformat': audio_format,
+        'outtmpl': output_path,
+        'noplaylist': True,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': audio_format,
+            'preferredquality': '192',
+        }],
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        result = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(result).replace('.webm', f'.{audio_format}')
+
+    return filename
+
+# Split audio into 30-second segments
+def split_audio(file_path: str, segment_length: int = 30):
+    audio = AudioSegment.from_file(file_path)
+    duration = len(audio)
+
+    base_directory = os.path.dirname(file_path)
+    file_name = os.path.splitext(os.path.basename(file_path))[0]
+    output_dir = os.path.join(base_directory, file_name + "_segments")
+    os.makedirs(output_dir, exist_ok=True)
+
+    segment_files = []
+    for i in range(0, duration, segment_length * 1000):
+        segment = audio[i:i + segment_length * 1000]
+        segment_file = os.path.join(output_dir, f"{file_name}_part_{i // 1000 // segment_length + 1}.mp3")
+        segment.export(segment_file, format="mp3")
+        segment_files.append(segment_file)
+    
+    return segment_files
+
+# Upload file to AssemblyAI
+def upload_file_to_assemblyai(file_path: str):
+    headers = {'authorization': ASSEMBLYAI_API_KEY}
+    with open(file_path, 'rb') as f:
+        response = requests.post('https://api.assemblyai.com/v2/upload', headers=headers, files={'file': f})
+    response.raise_for_status()
+    return response.json()['upload_url']
+
+# Request transcription for each uploaded file
+def request_transcription(upload_url: str):
+    endpoint = "https://api.assemblyai.com/v2/transcript"
+    headers = {
+        "authorization": ASSEMBLYAI_API_KEY,
+        "content-type": "application/json"
+    }
+    response = requests.post(endpoint, json={"audio_url": upload_url}, headers=headers)
+    response.raise_for_status()
+    return response.json()['id']  # Return transcript ID to track status
+
+# Track transcription status and retrieve results
+def get_transcription_result(transcript_id: str):
+    endpoint = f"https://api.assemblyai.com/v2/transcript/{transcript_id}"
+    headers = {"authorization": ASSEMBLYAI_API_KEY}
+    while True:
+        response = requests.get(endpoint, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        if data['status'] == 'completed':
+            return data['text']  # Return the transcription text
+        elif data['status'] == 'failed':
+            raise Exception(f"Transcription failed for ID {transcript_id}")
+        # Wait a moment before polling again
+        time.sleep(5)
+
+# Full process
+def process_video_to_transcriptions(video_url: str):
+    transcripts = []
+    socketio.emit('message', {"text": "getting video"})
+    audio_file = download_video_as_audio(video_url, audio_format='mp3')
+    socketio.emit('message', {"text": "parsing video"})
+    segment_files = split_audio(audio_file, segment_length=30)
+    
+    socketio.emit('message', {"text": "transcribing video"})
+    for segment_file in segment_files:
+        try:
+            print(f"Uploading {segment_file}...")
+            upload_url = upload_file_to_assemblyai(segment_file)
+            print(f"Requesting transcription for {segment_file}...")
+            transcript_id = request_transcription(upload_url)
+            print(f"Waiting for transcription of {segment_file}...")
+            transcript_text = get_transcription_result(transcript_id)
+            transcripts.append(transcript_text)
+            print(f"Transcription for {segment_file}:\n{transcript_text}\n")
+        except Exception as e:
+            print(f"Error processing {segment_file}: {e}")
+
+
+# API Endpoint 1: Upload Video for Transcription
+@app.route('/api/uploadtest', methods=['POST'])
+def upload_video():
+    video_url = request.json.get('video_url')
+    print(video_url)
+    socketio.emit('message', {"text": "getting video"})
+    process_video_to_transcriptions(video_url)
+
+
+    return jsonify({"success": "success"}, 200)
+
+
+
 # Main entry point to run the Flask app
 if __name__ == '__main__':
     app.run(debug=True)

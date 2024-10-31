@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import UrlInput from './components/UrlInput';
 import ChatView from './components/ChatView';
-import './App.css'; 
+import './App.css';
+
 
 interface UrlData {
   content: string;
 }
+
 
 const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -14,7 +16,7 @@ const App: React.FC = () => {
 
   const handleUrlSubmit = async (url: string) => {
     setIsChatOpen(true)
-    
+
     try {
       const response = await axios.post<UrlData>('http://localhost:5000/api/upload', { video_url: url });
       setUrlData(response.data);
