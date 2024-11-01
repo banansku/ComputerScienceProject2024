@@ -32,35 +32,40 @@ def upload_video():
 
     print(video_url)
 
-    with yt_dlp.YoutubeDL() as ydl:
-        info = ydl.extract_info(video_url, download=False)
+    ydl_opts = {
+        'format': 'm4a/bestaudio/best',  # The best audio version in m4a format
+        'outtmpl': '%(id)s.%(ext)s',  # The output name should be the id followed by the extension
+        'postprocessors': [{  # Extract audio using ffmpeg
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'm4a',
+        }],
+        'progress_hooks': [lambda d: set_downloaded_file_path(d)]
+    }
 
-    for format in info["formats"][::-1]:
-        if format["resolution"] == "audio only" and format["ext"] == "m4a":
-            url = format["url"]
-            print(url)
-            break
+    def set_downloaded_file_path(d):
+        global downloaded_file_path
+        if d['status'] == 'finished':
+            downloaded_file_path = d['filename']
+
+    socketio.emit('message', {"text": "Getting video"})
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        error_code = ydl.download(video_url)
+
+    print(downloaded_file_path)
 
     if not video_url:
         return jsonify({"error": "Video URL is required"}), 400
 
-    '''headers = {'authorization': ASSEMBLY_API_KEY}
-    data = {'audio_url': video_url}'''
+    socketio.emit('message', {"text": "Transcribing video"})
 
     transcriber = aai.Transcriber()
-    transcript = transcriber.transcribe(url)
+    transcript = transcriber.transcribe(downloaded_file_path)
     print(transcript.text)
 
-    return jsonify({"transcription": transcript.text})
+    socketio.emit('message', {"text": transcript.text})
 
-    '''try:
-        response = requests.post('https://api.assemblyai.com/v2/transcript', json=data, headers=headers)
-        return jsonify({"response": response})
-        response_data = response.json()
-        transcription_id = response_data['id']
-        return jsonify({"transcription_id": transcript})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500'''
+    return jsonify({"transcription": transcript.text})
 
 @socketio.on('track_transcription')
 def track_transcription(data):
@@ -243,7 +248,7 @@ def process_video_to_transcriptions(video_url: str):
 
 # API Endpoint 1: Upload Video for Transcription
 @app.route('/api/uploadtest', methods=['POST'])
-def upload_video():
+def upload_video_test():
     video_url = request.json.get('video_url')
     print(video_url)
     socketio.emit('message', {"text": "getting video"})
