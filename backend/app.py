@@ -3,18 +3,23 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import assemblyai as aai
 import openai
+from openai import OpenAI
 import requests
 import time
 import yt_dlp
 import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
-# Set your API keys here
+# Set API keys here
+load_dotenv()
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+)
 aai.settings.api_key = os.getenv("ASSEMBLY_API_KEY")
-openai.api_key = os.getenv("openai.api_key")
 test_url = os.getenv("test_url")
 
 @app.before_request
@@ -63,9 +68,109 @@ def upload_video():
     transcript = transcriber.transcribe(downloaded_file_path)
     print(transcript.text)
 
-    socketio.emit('message', {"text": transcript.text})
+    try:
+        os.remove(downloaded_file_path)
+        print("video deleted from local")
+    except FileNotFoundError:
+        print("File not found")
+    except PermissionError:
+        print("You do not have permission to delete this file")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-    return jsonify({"transcription": transcript.text})
+    socketio.emit('message', {"text": "Summarizing transcript"})
+
+    def split_text(text, max_length=2000):
+        sentences = re.split(r'(?<=[.!?]) +', text)
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) > max_length:
+                chunks.append(current_chunk.strip())
+                current_chunk = sentence
+            else:
+                current_chunk += " " + sentence
+
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
+    def summarize_chunk(chunk):
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that summarizes text."},
+                {"role": "user", "content": f"Summarize this: {chunk}"}
+            ],
+            max_tokens=200
+        )
+        return response['choices'][0]['message']['content']
+
+    def summarize_transcription(text):
+        chunks = split_text(text)
+        chunk_summaries = [summarize_chunk(chunk) for chunk in chunks]
+        
+        combined_summary_text = " ".join(chunk_summaries)
+        
+        # Summarize the combined summaries to get the final overview
+        final_summary_response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that summarizes text."},
+                {"role": "user", "content": f"Summarize this overall content: {combined_summary_text}"}
+            ],
+            max_tokens=200
+        )
+        
+        final_summary = final_summary_response['choices'][0]['message']['content']
+        return final_summary, chunk_summaries
+
+    
+    def answer_question(summary, chunk_summaries, question):
+        # Start with the overall summary as context
+        chat_history = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": f"Here is a summary of the video transcription: {summary}"},
+            {"role": "user", "content": question}
+        ]
+        
+        # Get a response based on the overall summary
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=chat_history,
+            max_tokens=200
+        )
+        
+        answer = response['choices'][0]['message']['content']
+        
+        # If the answer seems incomplete, look at chunk summaries for more detail
+        if "I don't have enough information" in answer or len(answer) < 50:
+            for chunk_summary in chunk_summaries:
+                chat_history.append({"role": "user", "content": f"Additional context: {chunk_summary}"})
+                chat_history.append({"role": "user", "content": question})
+                
+                response = client.chat.completions.create(
+                    model="gpt-4",
+                    messages=chat_history,
+                    max_tokens=200
+                )
+                answer = response['choices'][0]['message']['content']
+                
+                if len(answer) > 50:  # Assuming a longer answer indicates it was able to answer
+                    break
+        
+        return answer
+
+    try:
+        final_summary, chunk_summaries = summarize_transcription(transcript.text)
+        return jsonify({"summary": final_summary, "chunk_summaries": chunk_summaries})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+    socketio.emit('message', {"text": final_summary})
+    
 
 @socketio.on('track_transcription')
 def track_transcription(data):
