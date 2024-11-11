@@ -34,6 +34,9 @@ def log_request_info():
 # API Endpoint 1: Upload Video for Transcription
 @app.route('/api/upload', methods=['POST'])
 def upload_video():
+    global video_title
+    global video_uploader
+
     video_url = request.json.get('video_url')
 
     print(video_url)
@@ -52,8 +55,13 @@ def upload_video():
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         error_code = ydl.download(video_url)
+        info = ydl.extract_info(video_url, download=False)
+        video_title = info.get('title')
+        video_uploader = info.get('uploader')
 
     print(downloaded_file_path)
+    print(video_title)
+    print(video_uploader)
 
     if not video_url:
         return jsonify({"error": "Video URL is required"}), 400
@@ -94,7 +102,7 @@ def ask_question():
         return jsonify({"error": "Summary or question not provided"}), 400
     try:
         answer = answer_question(summary, summaries, question)
-        socketio.emit('message', {"text": answer})
+        socketio.emit('message', {"text": answer.encode('unicode_escape').decode('utf-8')})
         return jsonify({"answer": "200 OK"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -104,7 +112,7 @@ def set_downloaded_file_path(d):
     if d['status'] == 'finished':
         downloaded_file_path = d['filename']   
 
-def split_text(text, max_length=2000):
+def split_text(text, max_length=10000):
     print("splitting")
     global chunks
     global current_chunk
@@ -130,11 +138,12 @@ def summarize_chunk(chunk):
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions."},
-            {"role": "user", "content": f"Summarize this: {chunk}"}
+            {"role": "user", "content": f"Summarize this: {chunk}. For context, the video title is {video_title} and the uploader is {video_uploader}"}
         ],
         max_tokens=200
     )
     return response.choices[0].message.content
+
 def summarize_transcription(text):
     print("summarizing transcription")
     global chunk_summaries
@@ -154,42 +163,28 @@ def summarize_transcription(text):
     )
     
     final_summary = final_summary_response.choices[0].message.content
-    return final_summary, chunk_summaries
+    return final_summary.encode('unicode_escape').decode('utf-8'), chunk_summaries
 
 def answer_question(summary, chunk_summaries, question):
-    # Start with the overall summary as context
-    chat_history = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": f"Here is a summary of the video transcription: {summary}"},
-        {"role": "user", "content": question}
-    ]
     
-    # Get a response based on the overall summary
+    chat_history = [
+        {"role": "system", "content": "You are a helpful youtube video transcription assistant."},
+        {"role": "system", "content": f"Here is what you know about the video: {chunks}. " 
+                                    + f"The video title is {video_title}, " 
+                                    + f"and the uploader of the video is {video_uploader}. " 
+                                    + "If you don't know something, say 'I don't know'."},
+        {"role": "user", "content": question}
+        ]
+        
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=chat_history,
         max_tokens=200
     )
-    
     answer = response.choices[0].message.content
+    print(answer.encode('unicode_escape').decode('utf-8'))
     
-    # If the answer seems incomplete, look at chunk summaries for more detail
-    if "I don't have enough information" in answer or len(answer) < 50:
-        for chunk_summary in chunk_summaries:
-            chat_history.append({"role": "user", "content": f"Additional context: {chunk_summary}"})
-            chat_history.append({"role": "user", "content": question})
-            
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=chat_history,
-                max_tokens=200
-            )
-            answer = response.choices[0].message.content
-            
-            if len(answer) > 50:  # Assuming a longer answer indicates it was able to answer
-                break
-    
-    return answer
+    return answer.encode('unicode_escape').decode('utf-8')
 
 #@socketio.on('track_transcription')
 #def track_transcription(data):
