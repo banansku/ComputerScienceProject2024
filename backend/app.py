@@ -48,11 +48,6 @@ def upload_video():
         'progress_hooks': [lambda d: set_downloaded_file_path(d)]
     }
 
-    def set_downloaded_file_path(d):
-        global downloaded_file_path
-        if d['status'] == 'finished':
-            downloaded_file_path = d['filename']
-
     socketio.emit('message', {"text": "Getting video"})
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -89,10 +84,30 @@ def upload_video():
         return jsonify({"summary": final_summary, "chunk_summaries": chunk_summaries})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+@app.route('/api/ask_question', methods=['POST'])
+def ask_question():
+    question = request.json.get('question')
+    summary = final_summary
+    summaries = chunk_summaries
+    if not summary or not question:
+        return jsonify({"error": "Summary or question not provided"}), 400
+    try:
+        answer = answer_question(summary, summaries, question)
+        socketio.emit('message', {"text": answer})
+        return jsonify({"answer": "200 OK"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def set_downloaded_file_path(d):
+    global downloaded_file_path
+    if d['status'] == 'finished':
+        downloaded_file_path = d['filename']   
 
 def split_text(text, max_length=2000):
     print("splitting")
+    global chunks
+    global current_chunk
     sentences = re.split(r'(?<=[.!?]) +', text)
     chunks = []
     current_chunk = ""
@@ -114,7 +129,7 @@ def summarize_chunk(chunk):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that summarizes text."},
+            {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions."},
             {"role": "user", "content": f"Summarize this: {chunk}"}
         ],
         max_tokens=200
@@ -122,6 +137,8 @@ def summarize_chunk(chunk):
     return response.choices[0].message.content
 def summarize_transcription(text):
     print("summarizing transcription")
+    global chunk_summaries
+    global final_summary
     chunks = split_text(text)
     chunk_summaries = [summarize_chunk(chunk) for chunk in chunks]
     
@@ -131,7 +148,7 @@ def summarize_transcription(text):
     final_summary_response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that summarizes text."},
+            {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions."},
             {"role": "user", "content": f"Summarize this overall content: {combined_summary_text}"}
         ]
     )
