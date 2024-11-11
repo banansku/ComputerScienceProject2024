@@ -5,7 +5,7 @@ import ChatView from './components/ChatView';
 import './App.css';
 
 
-interface UrlData {
+export interface UrlData {
   content: string;
 }
 
@@ -28,7 +28,7 @@ const App: React.FC = () => {
 
   return (
     <div className="App">
-      <div className="form-container">
+     <div className="form-container">
         {isChatOpen ? <ChatView data={urlData} /> : <UrlInput onSubmit={handleUrlSubmit} />}
       </div>
     </div>

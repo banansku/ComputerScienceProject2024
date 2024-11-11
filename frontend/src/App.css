@@ -18,7 +18,7 @@ html, body {
 .chat-container {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  min-width: 500px;
   width: 90%;
   max-width: 600px;
   height: 80vh;
@@ -54,6 +54,7 @@ html, body {
   display: flex;
   align-items: center;
   background-color: #565b69;
+  justify-content: flex-end;
   padding: 10px;
   border-radius: 8px;
   margin-top: 10px;

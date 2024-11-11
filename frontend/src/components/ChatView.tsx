@@ -1,5 +1,7 @@
+import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
+import { UrlData } from '../App';
 
 interface Message {
   text: string;
@@ -28,12 +30,14 @@ const ChatView: React.FC<ChatViewProps> = ({ data }) => {
     };
   }, []);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (input.trim()) {
       const newMessage: Message = { text: input, from: 'user' };
+      
       setMessages([...messages, newMessage]);
-      socket.emit('send_message', newMessage); // Send the message to the server
       setInput('');
+
+      await axios.post('http://localhost:5000/api/ask_question', { question: input });
     }
   };
 
