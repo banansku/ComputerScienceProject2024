@@ -84,6 +84,8 @@ def upload_video():
     try:
         final_summary, chunk_summaries = summarize_transcription(transcript.text)
         socketio.emit('message', {"text": final_summary})
+        socketio.emit('message', {"text": "If you have further questions, I can answer them."})
+        
         return jsonify({"summary": final_summary, "chunk_summaries": chunk_summaries})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -131,8 +133,7 @@ def summarize_transcription(text):
         messages=[
             {"role": "system", "content": "You are a helpful assistant that summarizes text."},
             {"role": "user", "content": f"Summarize this overall content: {combined_summary_text}"}
-        ],
-        max_tokens=200
+        ]
     )
     
     final_summary = final_summary_response.choices[0].message.content
