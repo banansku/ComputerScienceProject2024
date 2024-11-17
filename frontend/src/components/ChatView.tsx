@@ -1,7 +1,6 @@
 import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
-import { UrlData } from '../App';
 
 interface Message {
   text: string;
@@ -9,12 +8,12 @@ interface Message {
 }
 
 interface ChatViewProps {
-  data: { content: string } | null;
+  onResetView: () => void;
 }
 
 const socket = io('http://localhost:5000'); // Connect to the server
 
-const ChatView: React.FC<ChatViewProps> = ({ data }) => {
+const ChatView: React.FC<ChatViewProps> = (props: ChatViewProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
 
@@ -41,8 +40,17 @@ const ChatView: React.FC<ChatViewProps> = ({ data }) => {
     }
   };
 
+  const resetView = () => {
+    setInput('');
+    setMessages([])
+    props.onResetView();
+  }
+
   return (
+
     <div className="chat-container">
+    <button className='reset-button' onClick={resetView}>Reset</button>
+
       {messages.map((msg, index) => (
         <div key={index} className={`message ${msg.from}`}>
           {msg.text}

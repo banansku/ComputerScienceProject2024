@@ -60,6 +60,12 @@ html, body {
   margin-top: 10px;
 }
 
+.reset-button {
+  display: flex;
+  align-self: flex-end;
+  background-color: #343541;
+}
+
 input[type="text"] {
   flex: 1;
   padding: 10px;

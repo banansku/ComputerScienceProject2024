@@ -12,24 +12,25 @@ export interface UrlData {
 
 const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [urlData, setUrlData] = useState<UrlData | null>(null);
 
   const handleUrlSubmit = async (url: string) => {
     setIsChatOpen(true)
 
     try {
-      const response = await axios.post<UrlData>('http://localhost:5000/api/upload', { video_url: url });
-      setUrlData(response.data);
-      setIsChatOpen(true);
+      axios.post<UrlData>('http://localhost:5000/api/upload', { video_url: url }).then(() => setIsChatOpen(true))
     } catch (error) {
       console.error("Error processing the URL:", error);
     }
   };
 
+  const resetChat = () => {
+    setIsChatOpen(false)
+  }
+
   return (
     <div className="App">
      <div className="form-container">
-        {isChatOpen ? <ChatView data={urlData} /> : <UrlInput onSubmit={handleUrlSubmit} />}
+        {isChatOpen ? <ChatView onResetView={resetChat}/> : <UrlInput onSubmit={handleUrlSubmit} />}
       </div>
     </div>
   );
