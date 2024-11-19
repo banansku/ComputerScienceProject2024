@@ -46,15 +46,19 @@ const ChatView: React.FC<ChatViewProps> = (props: ChatViewProps) => {
     props.onResetView();
   }
 
+  const formattedText = (text: string) => {
+    return text
+    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // Replace **bold** with <b>bold</b>
+    .replace("\\u2019", "'")
+    .replace(/\\\\n/g, '<br />'); // Replace newlines with <br />
+  }
+
   return (
 
     <div className="chat-container">
     <button className='reset-button' onClick={resetView}>Reset</button>
-
       {messages.map((msg, index) => (
-        <div key={index} className={`message ${msg.from}`}>
-          {msg.text}
-        </div>
+        <div key={index} className={`message ${msg.from}`} dangerouslySetInnerHTML={{ __html: formattedText(msg.text) }}/>
       ))}
       <div className="input-container">
         <input
