@@ -52,7 +52,7 @@ const ChatView: React.FC<ChatViewProps> = (props: ChatViewProps) => {
     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // Replace **bold** with <b>bold</b>
     .replace("\\u2019", "'")
     .replace("\\u2014", " - ")
-    .replace(/\\n\\n/, '<br />')
+    .replace(/\\n\\n/g, '<br />')
     .replace(/\\\\n/g, '<br />'); // Replace newlines with <br />
   }
 
