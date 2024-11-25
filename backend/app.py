@@ -102,7 +102,7 @@ def ask_question():
         return jsonify({"error": "Summary or question not provided"}), 400
     try:
         answer = answer_question(summary, summaries, question)
-        socketio.emit('message', {"text": answer.encode('unicode_escape').decode('utf-8')})
+        socketio.emit('message', {"text": answer.replace("\n", "\\n")})
         return jsonify({"answer": "200 OK"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -137,7 +137,7 @@ def summarize_chunk(chunk):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions."},
+            {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions. You do not use markdown format."},
             {"role": "user", "content": f"Summarize this: {chunk}. For context, the video title is {video_title} and the uploader is {video_uploader}"}
         ],
         max_tokens=200
@@ -157,18 +157,18 @@ def summarize_transcription(text):
     final_summary_response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions."},
+            {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions. You do not use markdown format."},
             {"role": "user", "content": f"Summarize this overall content: {combined_summary_text}"}
         ]
     )
     
     final_summary = final_summary_response.choices[0].message.content
-    return final_summary.encode('unicode_escape').decode('utf-8'), chunk_summaries
+    return final_summary.replace("\n", "\\n"), chunk_summaries
 
 def answer_question(summary, chunk_summaries, question):
     
     chat_history = [
-        {"role": "system", "content": "You are a helpful youtube video transcription assistant."},
+        {"role": "system", "content": "You are a helpful assistant that summarizes youtube video transcriptions. You do not use markdown format."},
         {"role": "system", "content": f"Here is what you know about the video: {chunks}. " 
                                     + f"The video title is {video_title}, " 
                                     + f"and the uploader of the video is {video_uploader}. " 
@@ -178,13 +178,12 @@ def answer_question(summary, chunk_summaries, question):
         
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=chat_history,
-        max_tokens=200
+        messages=chat_history
     )
     answer = response.choices[0].message.content
-    print(answer.encode('unicode_escape').decode('utf-8'))
+    print(answer.replace("\n", "\\n"))
     
-    return answer.encode('unicode_escape').decode('utf-8')
+    return answer.replace("\n", "\\n")
 
 #@socketio.on('track_transcription')
 #def track_transcription(data):
